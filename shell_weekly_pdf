@@ -48,37 +48,38 @@ $path = getPath();
 $file = $path.$eDate."_Shell_Weekly_Events_Report_".$group_name.".pdf";
 
 $sql = "select dr.name as 'Driver'
-        , round(((sum(agg.odometer6)/100) * 1.60934), 2) as 'Kilometers'
-        , sum(agg.seatbeltEvents) as 'Seatbelt'
-        , sum(agg.aggressiveAccelEvents) as 'Acceleration'
-        , sum(agg.idleLoEvents + agg.idleHiEvents) as 'Over Idle'
-        , sum(IfNull(rev.rpmEvents,0)) as 'Over Rev'
-        , sum(agg.aggressiveBrakeEvents) as 'Hard Brake'
-        , sum(agg.aggressiveBumpEvents) as 'Hard Bump'
-        , sum(agg.aggressiveLeftEvents + agg.aggressiveRightEvents) as 'Hard Turn'
-        , sum(agg.speedEvents1) + sum(agg.speedEvents2) + sum(agg.speedEvents3) + sum(agg.speedEvents4) + sum(agg.speedEvents5) as 'Speeding'
-                from agg 
-                left join vehicle v on v.vehicle_id = agg.vehicle_id
-                join driver dr on agg.driver_id = dr.driver_id
-                left join (
-                        select n.driver_id, n.vehicle_id, date_format(convert_TZ(n.time, 'GMT', dr.tzName), '%M-%y') aggDate, count(*) rpmEvents
-                        from note n
-                        join driver dr on n.driver_id = dr.driver_id
-                                where n.account_id = 52
-                                and n.type in (4, 14, 49, 58, 93, 191, 192)
-                                and n.time >= date_format(current_date, '%Y-%m-%01') - interval 7 day
-                                and n.time < date_format(current_date, '%Y-%m-%01')
-                                        group by 1, 2, 3
-                                ) rev on rev.vehicle_id = v.vehicle_id and rev.driver_id =dr.driver_id and agg.aggDate = rev.aggDate
+, round(((sum(ifNull(agg.odometer6, 0))/100) * 1.60934), 2) as 'Kilometers'
+, sum(ifNull(agg.seatbeltEvents, 0)) as 'Seatbelt'
+, sum(ifNull(agg.aggressiveAccelEvents, 0)) as 'Acceleration'
+, sum(ifNull(agg.idleLoEvents + agg.idleHiEvents, 0)) as 'Over Idle'
+, sum(ifNull(rev.rpmEvents,0)) as 'Over Rev'
+, sum(ifNull(agg.aggressiveBrakeEvents, 0)) as 'Hard Brake'
+, sum(ifNull(agg.aggressiveBumpEvents, 0)) as 'Hard Bump'
+, sum(ifNull(agg.aggressiveLeftEvents + agg.aggressiveRightEvents, 0)) as 'Hard Turn'
+, sum(ifNull(agg.speedEvents1, 0)) + sum(ifNull(agg.speedEvents2, 0)) + sum(ifNull(agg.speedEvents3, 0)) + sum(ifNull(agg.speedEvents4, 0)) + sum(ifNull(agg.speedEvents5, 0)) as 'Speeding'
+        from driver dr
+        left join agg on dr.driver_id = agg.driver_id
+                and agg.aggDate >= '".$sDate."'
+                and agg.aggDate < '".$eDate."' + interval 1 day
+        left join (
+                        select dr.driver_id
+                        , n.vehicle_id
+                        , date_format(convert_TZ(n.time, 'GMT', dr.tzName), '%Y-%m-%d') aggDate
+                        , count(*) rpmEvents
+                                from driver dr
+                                join note n on n.driver_id = dr.driver_id
+                                        where dr.account_id = 52 and dr.group_id = 8649146
+                                        and n.type in (4, 14, 49, 58, 93, 191, 192)
+                                        and n.time >= current_date - interval 7 day
+                                        and n.time < current_date
+                                group by 1, 2, 3
+                        ) rev on dr.driver_id =rev.driver_id and agg.aggDate = rev.aggDate
 
-                        where dr.account_id = 52
-                        and dr.group_fullname like 'inthinc/Shell/Canada/Greater Deep Basin/%'
-                        and dr.group_id = '".$group_ID."'
-                        and dr.status_id not in (3, 4)
-                        and agg.aggDate >= '".$sDate."'
-                        and agg.aggDate < '".$eDate."' + interval 1 day
-                                group by dr.name
-                                order by dr.name;
+                where dr.account_id = 52
+                and dr.group_id = '".$group_ID."'
+                and dr.status_id not in (3, 4)
+                        group by dr.name
+                        order by Kilometers DESC;
 ";
 }
 
